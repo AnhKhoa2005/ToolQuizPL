@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tool Quiz Master Online (V6 - Fix Lặp)</title>
+    <title>Tool Quiz Master Online (V10 - Timer & Mixer)</title>
     <style>
         :root {
             --primary: #4f46e5;
@@ -86,7 +86,7 @@
         }
         textarea:focus { outline: none; border-color: var(--primary); }
 
-        input[type="text"] {
+        input[type="text"], input[type="number"] {
             width: 100%; padding: 12px; margin-bottom: 15px;
             border: 2px solid var(--border); border-radius: 8px;
             font-size: 16px; box-sizing: border-box;
@@ -152,9 +152,13 @@
         .quiz-option.correct { border-color: var(--success) !important; background: #dcfce7 !important; color: #15803d !important; }
         .quiz-option.wrong { border-color: var(--danger) !important; background: #fee2e2 !important; color: #991b1b !important; }
         .study-correct { border-color: var(--success); background: #dcfce7; font-weight: bold; }
+        
+        /* New Review Styles */
+        .review-correct { border-color: var(--success); background: #dcfce7; color: #15803d; font-weight: bold; }
+        .review-wrong { border-color: var(--danger); background: #fee2e2; color: #991b1b; }
 
         /* --- TOGGLE SWITCH --- */
-        .toggle-switch { display: flex; align-items: center; gap: 10px; margin: 15px 0; cursor: pointer; }
+        .toggle-switch { display: flex; align-items: center; gap: 10px; margin: 5px 0; cursor: pointer; }
         .toggle-input { display: none; }
         .toggle-slider {
             width: 44px; height: 24px; background: #cbd5e1; border-radius: 20px;
@@ -166,6 +170,20 @@
         }
         .toggle-input:checked + .toggle-slider { background: var(--primary); }
         .toggle-input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+        /* --- MIXER STYLES --- */
+        .mixer-item {
+            display: flex; align-items: center; padding: 12px; border-bottom: 1px solid var(--border);
+        }
+        .mixer-item:last-child { border-bottom: none; }
+        .mixer-checkbox { width: 20px; height: 20px; margin-right: 15px; cursor: pointer; }
+
+        /* --- TIMER --- */
+        .timer-box {
+            background: #fff; padding: 8px 15px; border-radius: 8px; font-weight: bold; color: var(--danger); border: 2px solid var(--danger);
+            display: none; align-items: center; gap: 5px;
+        }
+        .timer-box.active { display: flex; }
 
         /* --- RESULT --- */
         .score-circle {
@@ -197,8 +215,9 @@
         <h2 style="margin:0; font-size:18px;">🎓 Quiz Master Pro</h2>
         <div style="display:flex; gap:10px;">
             <div class="tabs">
-                <button class="tab-btn active" onclick="switchTab('creator')">Tạo Quiz Mới</button>
-                <button class="tab-btn" onclick="switchTab('library')">Thư Viện Đề</button>
+                <button class="tab-btn active" onclick="switchTab('creator')">Tạo Quiz</button>
+                <button class="tab-btn" onclick="switchTab('library')">Thư Viện</button>
+                <button class="tab-btn" onclick="switchTab('mixer')">🔀 Trộn Đề</button>
             </div>
             <button class="server-status" id="status-badge" onclick="openConfigModal()">⚙️ Kết nối Server</button>
         </div>
@@ -206,7 +225,6 @@
 
     <!-- TAB 1: CREATOR -->
     <div id="creator" class="section active">
-        <!-- Step 1: Input -->
         <div id="creator-step1">
             <p style="color:#64748b; margin-top:0;">Dán câu hỏi và đáp án vào đây (Tool sẽ tự động lọc sạch A, B, C cũ):</p>
             <textarea id="rawInput" placeholder="Ví dụ:
@@ -218,14 +236,12 @@ B. Đà Nẵng"></textarea>
             </div>
         </div>
 
-        <!-- Step 2: Select Answers -->
         <div id="creator-step2" class="hidden">
             <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
                 <h3>Chọn đáp án đúng</h3>
                 <button class="btn btn-outline" onclick="resetCreator()">Quay lại</button>
             </div>
             <div id="selectionList" style="flex:1; overflow-y:auto; margin-bottom:15px;"></div>
-            
             <div class="sticky-footer" style="flex-direction:column; gap:10px; align-items:stretch;">
                 <input type="text" id="quizNameInput" placeholder="Nhập tên bài Quiz (VD: Ôn tập chương 1)...">
                 <div style="display:flex; gap:10px;">
@@ -251,27 +267,41 @@ B. Đà Nẵng"></textarea>
             </div>
         </div>
 
-        <!-- Pre-Quiz View (Chọn chế độ) -->
+        <!-- Pre-Quiz View -->
         <div id="lib-pre-quiz" class="hidden">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                <button class="btn btn-outline" onclick="backToLibrary()">⬅️ Quay lại thư viện</button>
-                <button class="btn btn-danger" onclick="deleteCurrentQuiz()">🗑️ Xóa bài này</button>
+                <button class="btn btn-outline" onclick="backToLibrary()">⬅️ Quay lại</button>
+                <button class="btn btn-danger" id="btnDeleteQuiz" onclick="deleteCurrentQuiz()">🗑️ Xóa bài này</button>
             </div>
             
-            <div style="text-align:center; margin-top:20px;">
+            <div style="text-align:center; margin-top:10px;">
                 <h2 id="currentQuizTitle" style="font-size:24px; color:var(--primary);">Tên bài thi</h2>
                 <p style="color:#64748b;" id="currentQuizMeta">Số câu hỏi: 0</p>
                 
-                <div style="background:#f1f5f9; padding:20px; border-radius:12px; display:inline-block; text-align:left; margin:20px 0;">
+                <div style="background:#f1f5f9; padding:20px; border-radius:12px; display:inline-block; text-align:left; margin:20px 0; width: 100%; max-width: 400px;">
+                    <!-- Random Toggle -->
                     <label class="toggle-switch">
                         <input type="checkbox" id="randomToggle" class="toggle-input">
                         <span class="toggle-slider"></span>
                         <span style="font-weight:600;">Xáo trộn câu hỏi (Random)</span>
                     </label>
+                    
+                    <!-- Timer Toggle -->
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-top:15px;">
+                        <label class="toggle-switch" style="margin:0;">
+                            <input type="checkbox" id="timerToggle" class="toggle-input" onchange="toggleTimerInput()">
+                            <span class="toggle-slider"></span>
+                            <span style="font-weight:600;">Tính thời gian</span>
+                        </label>
+                        <div id="timerInputBox" style="display:none; align-items:center; gap:5px;">
+                            <input type="number" id="timerValue" value="15" style="width:60px; padding:5px; margin:0; text-align:center;" min="1">
+                            <span>phút</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div style="display:flex; gap:15px; justify-content:center; margin-top:20px;">
-                    <button class="btn btn-success" onclick="startQuiz('study')" style="padding:15px 30px; font-size:18px;">📖 Vào Học (Hiện đáp án)</button>
+                    <button class="btn btn-success" onclick="startQuiz('study')" style="padding:15px 30px; font-size:18px;">📖 Vào Học</button>
                     <button class="btn btn-primary" onclick="startQuiz('exam')" style="padding:15px 30px; font-size:18px;">📝 Làm Bài Thi</button>
                 </div>
             </div>
@@ -280,15 +310,17 @@ B. Đà Nẵng"></textarea>
         <!-- Quiz Interface -->
         <div id="lib-quiz-interface" class="hidden">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; background:#e0e7ff; padding:10px 15px; border-radius:8px;">
-                <span style="font-weight:bold; color:var(--primary);" id="quizModeLabel">CHẾ ĐỘ THI</span>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <span style="font-weight:bold; color:var(--primary);" id="quizModeLabel">CHẾ ĐỘ THI</span>
+                    <div id="timerDisplay" class="timer-box">⏰ 00:00</div>
+                </div>
                 <span id="quizProgress">0/0</span>
             </div>
-            
             <div id="quizQuestionsContainer" style="flex:1; overflow-y:auto;"></div>
-
-            <div class="sticky-footer">
+            <div class="sticky-footer" id="quizFooter">
                 <button class="btn btn-danger" onclick="quitQuiz()">Thoát</button>
                 <button class="btn btn-success" id="submitBtn" onclick="submitQuiz()">Nộp Bài 🏁</button>
+                <button class="btn btn-primary" id="continueReviewBtn" style="display:none;" onclick="continueToRetry()">Bắt đầu làm lại ➡️</button>
             </div>
         </div>
 
@@ -298,16 +330,39 @@ B. Đà Nẵng"></textarea>
                 <h2>Kết Quả</h2>
                 <div class="score-circle" id="scoreValue">0/0</div>
                 <p id="scoreMsg" style="margin-bottom:30px; font-size:18px;">Cố lên!</p>
-                
                 <div style="display:flex; gap:10px; justify-content:center;">
-                    <button class="btn btn-danger" id="retryWrongBtn" onclick="retryWrong()" style="display:none;">🔁 Làm lại câu sai</button>
+                    <button class="btn btn-danger" id="retryWrongBtn" onclick="reviewWrong()" style="display:none;">🔁 Xem & Làm lại câu sai</button>
                     <button class="btn btn-outline" onclick="backToLibrary()">📂 Chọn bài khác</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- CONFIG MODAL -->
+    <!-- TAB 3: MIXER (TRỘN ĐỀ) -->
+    <div id="mixer" class="section">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h3 style="margin:0;">Chọn các bộ đề muốn trộn</h3>
+            <button class="btn btn-outline" onclick="refreshMixerLibrary()">🔄 Làm mới</button>
+        </div>
+        
+        <div id="mixerListContainer" style="flex:1; overflow-y:auto; border:1px solid var(--border); border-radius:8px; margin-bottom:15px;">
+            <!-- Quiz items to select -->
+        </div>
+
+        <div style="background:#f1f5f9; padding:15px; border-radius:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <span>Tổng số câu đã chọn: <strong id="totalMixedQ">0</strong></span>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span>Lấy ngẫu nhiên:</span>
+                    <input type="number" id="mixAmount" style="width:80px; margin:0; text-align:center;" min="1">
+                    <span>câu</span>
+                </div>
+            </div>
+            <button class="btn btn-primary" style="width:100%;" onclick="startMixedQuiz()">🔀 Trộn Đề & Làm Bài</button>
+        </div>
+    </div>
+
+    <!-- MODALS -->
     <div id="config-modal" class="modal-overlay">
         <div class="modal-content">
             <h3 style="margin-top:0;">Cấu Hình Firebase</h3>
@@ -320,7 +375,6 @@ B. Đà Nẵng"></textarea>
         </div>
     </div>
 
-    <!-- EXPORT MODAL -->
     <div id="export-modal" class="modal-overlay">
         <div class="modal-content">
             <h3 style="margin-top:0;">Xuất Dữ Liệu Text</h3>
@@ -339,21 +393,19 @@ B. Đà Nẵng"></textarea>
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    let db;
-    let isFirebaseReady = false;
-    let currentRawData = [];
-    let libraryData = []; // Cache list quiz
-    let activeQuiz = null; // Quiz đang làm
-    let activeQuestions = []; // Câu hỏi đang làm (đã shuffle hoặc chưa)
-    let wrongQuestions = []; // List câu sai
+    let db, isFirebaseReady = false;
+    let currentRawData = [], libraryData = [];
+    let activeQuiz = null, activeQuestions = [], wrongQuestions = [];
+    let timerInterval = null;
 
-    // --- GLOBAL FUNCTIONS (Expose to window) ---
+    // --- GLOBAL ---
     window.switchTab = (tab) => {
         document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(tab).classList.add('active');
         document.querySelector(`.tab-btn[onclick="switchTab('${tab}')"]`).classList.add('active');
         if(tab === 'library') refreshLibrary();
+        if(tab === 'mixer') refreshMixerLibrary();
     };
 
     window.openConfigModal = () => {
@@ -361,33 +413,25 @@ B. Đà Nẵng"></textarea>
         document.getElementById('configInput').value = localStorage.getItem('fb_config_str') || '';
     };
     
-    window.closeModal = (id) => {
-        const modalId = id || 'config-modal';
-        document.getElementById(modalId).classList.remove('open');
-    };
+    window.closeModal = (id) => document.getElementById(id).classList.remove('open');
 
     window.saveConfig = () => {
         const input = document.getElementById('configInput').value.trim();
         try {
-            // Parse config object manually from string
             const configObj = {};
             const keys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
             keys.forEach(key => {
                 const match = input.match(new RegExp(`${key}:\\s*["']([^"']+)["']`));
                 if(match) configObj[key] = match[1];
             });
-            
             if(!configObj.apiKey) throw new Error("Không tìm thấy Config hợp lệ");
-
             localStorage.setItem('fb_config', JSON.stringify(configObj));
             localStorage.setItem('fb_config_str', input);
             location.reload();
-        } catch(e) {
-            alert("Lỗi config: " + e.message);
-        }
+        } catch(e) { alert("Lỗi config: " + e.message); }
     };
 
-    // --- FIREBASE INIT ---
+    // --- APP INIT ---
     async function initApp() {
         const configStr = localStorage.getItem('fb_config');
         if(!configStr) {
@@ -400,14 +444,11 @@ B. Đà Nẵng"></textarea>
             isFirebaseReady = true;
             document.getElementById('status-badge').innerText = "🟢 Đã kết nối";
             document.getElementById('status-badge').classList.add('online');
-            refreshLibrary(); // Load ngay khi init
-        } catch(e) {
-            console.error(e);
-            alert("Lỗi kết nối Firebase!");
-        }
+            refreshLibrary();
+        } catch(e) { console.error(e); alert("Lỗi kết nối Firebase!"); }
     }
 
-    // --- CREATOR LOGIC (UPDATED V6) ---
+    // --- CREATOR ---
     window.analyzeRaw = () => {
         const text = document.getElementById('rawInput').value;
         const lines = text.split('\n').filter(l => l.trim());
@@ -416,28 +457,20 @@ B. Đà Nẵng"></textarea>
 
         lines.forEach(line => {
             let cleanLine = line.trim();
-            // Detect question
             const isQ = /^(Câu|Bài)\s/i.test(cleanLine) || /^\d+[\.:]/.test(cleanLine) || cleanLine.endsWith('?');
-            
             if(isQ) {
-                // CLEAN UP Question Text: Remove "Câu 1:", "1.", "Bài 1:"
                 let cleanText = cleanLine.replace(/^(Câu|Bài|Question)?\s*\d+[\.\:\)]\s*/i, '').trim();
-                
                 if(currentQ) currentRawData.push(currentQ);
                 currentQ = { text: cleanText, options: [], correctIdx: 0 };
             } else {
-                // CLEAN UP Option Text (V6: Aggressive loop cleanup)
-                // Loại bỏ lặp đi lặp lại: "-", "A.", "1.", "a)" cho đến khi sạch
                 let processed = cleanLine;
-                let maxLoops = 5; // Tránh lặp vô hạn
+                let maxLoops = 5;
                 while(maxLoops > 0) {
                     let old = processed;
-                    processed = processed.replace(/^([\s\·\-\+\•\*]+|[\w]{1,2}[\.\)\:\-]\s*)/, '');
-                    processed = processed.trim();
-                    if(old === processed) break; // Không còn gì để xóa
+                    processed = processed.replace(/^([\s\·\-\+\•\*]+|[\w]{1,2}[\.\)\:\-]\s*)/, '').trim();
+                    if(old === processed) break;
                     maxLoops--;
                 }
-                
                 if(currentQ) currentQ.options.push(processed);
             }
         });
@@ -445,7 +478,6 @@ B. Đà Nẵng"></textarea>
 
         if(currentRawData.length === 0) { alert("Không tìm thấy câu hỏi!"); return; }
         
-        // Render step 2
         const container = document.getElementById('selectionList');
         container.innerHTML = '';
         currentRawData.forEach((q, qIdx) => {
@@ -453,9 +485,7 @@ B. Đà Nẵng"></textarea>
             div.className = 'question-block';
             let html = `<div style="font-weight:bold; margin-bottom:8px;">${qIdx + 1}. ${q.text}</div>`;
             q.options.forEach((opt, oIdx) => {
-                html += `<label class="opt-label">
-                    <input type="radio" name="q_${qIdx}" ${oIdx===0?'checked':''} onchange="updateCorrect(${qIdx}, ${oIdx})"> ${opt}
-                </label>`;
+                html += `<label class="opt-label"><input type="radio" name="q_${qIdx}" ${oIdx===0?'checked':''} onchange="updateCorrect(${qIdx}, ${oIdx})"> ${opt}</label>`;
             });
             div.innerHTML = html;
             container.appendChild(div);
@@ -471,49 +501,34 @@ B. Đà Nẵng"></textarea>
         document.getElementById('creator-step2').classList.add('hidden');
     };
 
-    // --- EXPORT TEXT FEATURE (V6: CLEAN & STANDARD) ---
     window.exportTextFormat = () => {
-        if (!currentRawData || currentRawData.length === 0) {
-            alert("Chưa có dữ liệu để xuất!");
-            return;
-        }
-
+        if (!currentRawData || currentRawData.length === 0) { alert("Chưa có dữ liệu!"); return; }
         let output = "";
-        
         currentRawData.forEach((q, index) => {
-            output += `${q.text}\n`; // Câu hỏi (Không thêm số thứ tự nếu đã có)
-            
+            output += `${q.text}\n`;
             q.options.forEach((opt, optIdx) => {
-                const isCorrect = optIdx === q.correctIdx;
-                const symbol = isCorrect ? "+" : "-";
+                const symbol = optIdx === q.correctIdx ? "+" : "-";
                 output += `${symbol} ${opt}\n`;
             });
             output += "\n"; 
         });
-
         document.getElementById('export-modal').classList.add('open');
         document.getElementById('exportInput').value = output;
     };
 
-    // --- EXPORT LIBRARY QUIZ ---
     window.exportLibraryQuiz = (e, id) => {
         e.stopPropagation();
         const quiz = libraryData.find(q => q.id === id);
         if(!quiz) return;
-
         let output = "";
-        
         quiz.questions.forEach((q, index) => {
             output += `${q.text}\n`;
-            
             q.options.forEach((opt, optIdx) => {
-                const isCorrect = opt.isCorrect;
-                const symbol = isCorrect ? "+" : "-";
+                const symbol = opt.isCorrect ? "+" : "-";
                 output += `${symbol} ${opt.text}\n`;
             });
             output += "\n";
         });
-
         document.getElementById('export-modal').classList.add('open');
         document.getElementById('exportInput').value = output;
     };
@@ -522,89 +537,65 @@ B. Đà Nẵng"></textarea>
         const el = document.getElementById('exportInput');
         el.select();
         document.execCommand('copy');
-        alert("Đã copy vào bộ nhớ đệm!");
+        alert("Đã copy!");
     };
 
     window.saveQuizToCloud = async () => {
-        if(!isFirebaseReady) { alert("Vui lòng kết nối Server trước!"); return; }
+        if(!isFirebaseReady) { alert("Chưa kết nối Server!"); return; }
         const name = document.getElementById('quizNameInput').value.trim();
-        if(!name) { alert("Nhập tên bài Quiz!"); return; }
-
+        if(!name) { alert("Nhập tên Quiz!"); return; }
         try {
             const questionsToSave = currentRawData.map(q => ({
-                text: q.text, // Lưu text sạch
-                options: q.options.map((opt, idx) => ({
-                    text: opt, // Lưu text sạch
-                    isCorrect: idx === q.correctIdx
-                }))
+                text: q.text,
+                options: q.options.map((opt, idx) => ({ text: opt, isCorrect: idx === q.correctIdx }))
             }));
-
-            await addDoc(collection(db, "quizzes"), {
-                name: name,
-                questions: questionsToSave,
-                createdAt: Date.now()
-            });
-
-            alert("Đã lưu thành công!");
+            await addDoc(collection(db, "quizzes"), { name: name, questions: questionsToSave, createdAt: Date.now() });
+            alert("Đã lưu!");
             document.getElementById('rawInput').value = '';
             document.getElementById('quizNameInput').value = '';
             resetCreator();
             switchTab('library'); 
-        } catch(e) {
-            alert("Lỗi lưu: " + e.message);
-        }
+        } catch(e) { alert("Lỗi lưu: " + e.message); }
     };
 
-    // --- LIBRARY LOGIC ---
+    // --- LIBRARY ---
     window.refreshLibrary = async () => {
-        if(!isFirebaseReady) {
-            document.getElementById('quizListContainer').innerHTML = '<div style="text-align:center; padding:20px;">Chưa kết nối Server (Offline)</div>';
-            return;
-        }
-        
+        if(!isFirebaseReady) { document.getElementById('quizListContainer').innerHTML = 'Offline Mode'; return; }
         try {
             const snapshot = await getDocs(collection(db, "quizzes"));
             libraryData = [];
             const container = document.getElementById('quizListContainer');
             container.innerHTML = '';
-
             snapshot.forEach(doc => {
                 const data = doc.data();
                 libraryData.push({ id: doc.id, ...data });
-                
                 const card = document.createElement('div');
                 card.className = 'quiz-card';
                 card.innerHTML = `
                     <div class="quiz-info" onclick="selectQuiz('${doc.id}')">
                         <h3>${data.name}</h3>
-                        <div class="quiz-meta">${data.questions.length} câu hỏi • ${new Date(data.createdAt).toLocaleDateString()}</div>
+                        <div class="quiz-meta">${data.questions.length} câu • ${new Date(data.createdAt).toLocaleDateString()}</div>
                     </div>
                     <div class="action-group">
-                        <button class="export-btn" onclick="exportLibraryQuiz(event, '${doc.id}')">📋 Xuất</button>
-                        <button class="delete-btn" onclick="deleteQuiz(event, '${doc.id}')">🗑️ Xóa</button>
-                    </div>
-                `;
+                        <button class="export-btn" onclick="exportLibraryQuiz(event, '${doc.id}')">📋</button>
+                        <button class="delete-btn" onclick="deleteQuiz(event, '${doc.id}')">🗑️</button>
+                    </div>`;
                 container.appendChild(card);
             });
-
-            if(libraryData.length === 0) container.innerHTML = '<div style="text-align:center;">Trống trơn! Hãy tạo quiz mới.</div>';
-
-        } catch(e) {
-            console.error(e);
-            if(e.code === 'permission-denied') alert("Lỗi quyền! Hãy bật Test Mode trong Firestore Rules.");
-        }
+            if(libraryData.length === 0) container.innerHTML = '<div style="text-align:center;">Trống!</div>';
+        } catch(e) { console.error(e); }
     };
 
     window.deleteQuiz = async (e, id) => {
         e.stopPropagation(); 
-        if(!confirm("CẢNH BÁO: Bạn có chắc chắn muốn xóa bài thi này không?")) return;
+        if(!confirm("Xóa?")) return;
         await deleteDoc(doc(db, "quizzes", id));
         refreshLibrary();
     };
     
     window.deleteCurrentQuiz = async () => {
         if(!activeQuiz) return;
-        if(!confirm(`Xóa bài "${activeQuiz.name}"?`)) return;
+        if(!confirm("Xóa?")) return;
         await deleteDoc(doc(db, "quizzes", activeQuiz.id));
         backToLibrary();
         refreshLibrary();
@@ -613,13 +604,16 @@ B. Đà Nẵng"></textarea>
     window.selectQuiz = (id) => {
         activeQuiz = libraryData.find(q => q.id === id);
         if(!activeQuiz) return;
-
         document.getElementById('lib-list-view').classList.add('hidden');
         document.getElementById('lib-pre-quiz').classList.remove('hidden');
-        
         document.getElementById('currentQuizTitle').innerText = activeQuiz.name;
-        document.getElementById('currentQuizMeta').innerText = `Tổng số: ${activeQuiz.questions.length} câu`;
-        document.getElementById('randomToggle').checked = false; 
+        document.getElementById('currentQuizMeta').innerText = `Tổng: ${activeQuiz.questions.length} câu`;
+        
+        // Reset controls
+        document.getElementById('randomToggle').checked = false;
+        document.getElementById('timerToggle').checked = false;
+        document.getElementById('timerInputBox').style.display = 'none';
+        document.getElementById('btnDeleteQuiz').style.display = 'block'; // Hiện nút xóa trong mode đơn
     };
 
     window.backToLibrary = () => {
@@ -628,30 +622,170 @@ B. Đà Nẵng"></textarea>
         document.getElementById('lib-list-view').classList.remove('hidden');
     };
 
-    // --- QUIZ TAKING LOGIC ---
-    window.startQuiz = (mode) => { 
-        const isRandom = document.getElementById('randomToggle').checked;
+    // --- MIXER LOGIC ---
+    window.refreshMixerLibrary = async () => {
+        if(libraryData.length === 0) await refreshLibrary();
         
-        activeQuestions = JSON.parse(JSON.stringify(activeQuiz.questions));
+        const container = document.getElementById('mixerListContainer');
+        container.innerHTML = '';
         
-        if(isRandom && mode === 'exam') {
-            activeQuestions.sort(() => Math.random() - 0.5);
+        libraryData.forEach(quiz => {
+            container.innerHTML += `
+                <div class="mixer-item">
+                    <input type="checkbox" class="mixer-checkbox" value="${quiz.id}" onchange="calcMixedTotal()">
+                    <div>
+                        <div style="font-weight:bold;">${quiz.name}</div>
+                        <div style="font-size:12px; color:#666;">${quiz.questions.length} câu</div>
+                    </div>
+                </div>
+            `;
+        });
+        document.getElementById('totalMixedQ').innerText = '0';
+    };
+
+    window.calcMixedTotal = () => {
+        const checkboxes = document.querySelectorAll('.mixer-checkbox:checked');
+        let total = 0;
+        checkboxes.forEach(cb => {
+            const quiz = libraryData.find(q => q.id === cb.value);
+            if(quiz) total += quiz.questions.length;
+        });
+        document.getElementById('totalMixedQ').innerText = total;
+        // Set max for input
+        const mixInput = document.getElementById('mixAmount');
+        mixInput.max = total;
+        mixInput.value = total; // Default to all
+    };
+
+    window.startMixedQuiz = () => {
+        const checkboxes = document.querySelectorAll('.mixer-checkbox:checked');
+        if(checkboxes.length === 0) { alert("Chọn ít nhất 1 bài!"); return; }
+
+        let allQuestions = [];
+        checkboxes.forEach(cb => {
+            const quiz = libraryData.find(q => q.id === cb.value);
+            if(quiz) allQuestions = allQuestions.concat(quiz.questions);
+        });
+
+        const limit = parseInt(document.getElementById('mixAmount').value);
+        if(!limit || limit <= 0 || limit > allQuestions.length) { 
+            alert(`Vui lòng nhập số lượng câu từ 1 đến ${allQuestions.length}`); 
+            return; 
         }
 
+        // Randomize mixed pool
+        allQuestions.sort(() => Math.random() - 0.5);
+        activeQuestions = JSON.parse(JSON.stringify(allQuestions.slice(0, limit)));
+        
+        // Setup Active Quiz Context (Fake one for display)
+        activeQuiz = { name: `Đề Trộn (${limit} câu)`, questions: activeQuestions };
+        
+        // Switch to Pre-Quiz View setup
+        switchTab('library'); // Go to tab
+        document.getElementById('lib-list-view').classList.add('hidden');
+        document.getElementById('lib-pre-quiz').classList.remove('hidden');
+        
+        document.getElementById('currentQuizTitle').innerText = activeQuiz.name;
+        document.getElementById('currentQuizMeta').innerText = `Tổng: ${limit} câu ngẫu nhiên`;
+        
+        // Reset toggle, hide delete button since it's mixed
+        document.getElementById('randomToggle').checked = false; 
+        document.getElementById('timerToggle').checked = false;
+        document.getElementById('timerInputBox').style.display = 'none';
+        document.getElementById('btnDeleteQuiz').style.display = 'none';
+    };
+
+    // --- TIMER LOGIC ---
+    window.toggleTimerInput = () => {
+        const isChecked = document.getElementById('timerToggle').checked;
+        document.getElementById('timerInputBox').style.display = isChecked ? 'flex' : 'none';
+    };
+
+    function startTimer(minutes) {
+        let timeLeft = minutes * 60;
+        const display = document.getElementById('timerDisplay');
+        display.classList.add('active');
+        
+        clearInterval(timerInterval);
+        updateTimerDisplay(timeLeft);
+
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            updateTimerDisplay(timeLeft);
+            
+            if(timeLeft <= 0) {
+                clearInterval(timerInterval);
+                alert("⏰ Hết giờ làm bài!");
+                submitQuiz(true); // Auto submit
+            }
+        }, 1000);
+    }
+
+    function stopTimer() {
+        clearInterval(timerInterval);
+        document.getElementById('timerDisplay').classList.remove('active');
+    }
+
+    function updateTimerDisplay(seconds) {
+        const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+        const s = (seconds % 60).toString().padStart(2, '0');
+        document.getElementById('timerDisplay').innerText = `⏰ ${m}:${s}`;
+        if(seconds < 60) document.getElementById('timerDisplay').style.color = 'red';
+        else document.getElementById('timerDisplay').style.color = 'var(--primary)';
+    }
+
+    // --- QUIZ & REVIEW LOGIC ---
+    window.startQuiz = (mode) => { 
+        const isRandom = document.getElementById('randomToggle').checked;
+        const useTimer = document.getElementById('timerToggle').checked;
+        
+        // Load questions
+        // If not mixed mode (already loaded), reload from activeQuiz
+        if(activeQuiz.name.indexOf('Đề Trộn') === -1) {
+            activeQuestions = JSON.parse(JSON.stringify(activeQuiz.questions));
+        }
+        
+        if(isRandom && mode === 'exam') activeQuestions.sort(() => Math.random() - 0.5);
         activeQuestions.forEach(q => q.userSelected = null);
+        
+        renderQuizInterface(mode, activeQuestions);
 
+        if(mode === 'exam' && useTimer) {
+            const minutes = parseInt(document.getElementById('timerValue').value) || 15;
+            startTimer(minutes);
+        } else {
+            stopTimer();
+        }
+    };
+
+    function renderQuizInterface(mode, questions, isReview = false) {
         document.getElementById('lib-pre-quiz').classList.add('hidden');
-        document.getElementById('lib-quiz-interface').classList.remove('hidden');
         document.getElementById('lib-result-interface').classList.add('hidden');
+        document.getElementById('lib-quiz-interface').classList.remove('hidden');
 
-        document.getElementById('quizModeLabel').innerText = mode === 'study' ? '📖 CHẾ ĐỘ HỌC' : '📝 CHẾ ĐỘ THI';
-        document.getElementById('quizProgress').innerText = `0/${activeQuestions.length}`;
-        document.getElementById('submitBtn').style.display = mode === 'study' ? 'none' : 'block';
+        let title = "";
+        if (isReview) title = "🔍 XEM LẠI CÂU SAI";
+        else title = mode === 'study' ? '📖 CHẾ ĐỘ HỌC' : '📝 CHẾ ĐỘ THI';
+        
+        document.getElementById('quizModeLabel').innerText = title;
+        document.getElementById('quizProgress').innerText = `0/${questions.length}`;
+        
+        // Button logic
+        const submitBtn = document.getElementById('submitBtn');
+        const continueBtn = document.getElementById('continueReviewBtn');
+        
+        if (isReview) {
+            submitBtn.style.display = 'none';
+            continueBtn.style.display = 'block';
+        } else {
+            submitBtn.style.display = mode === 'study' ? 'none' : 'block';
+            continueBtn.style.display = 'none';
+        }
 
         const container = document.getElementById('quizQuestionsContainer');
         container.innerHTML = '';
 
-        activeQuestions.forEach((q, qIdx) => {
+        questions.forEach((q, qIdx) => {
             const div = document.createElement('div');
             div.className = 'quiz-item';
             div.style.padding = '15px';
@@ -661,15 +795,23 @@ B. Đà Nẵng"></textarea>
             let html = `<div class="quiz-question">${qIdx + 1}. ${q.text}</div>`;
             q.options.forEach((opt, oIdx) => {
                 let cls = 'quiz-option';
-                if(mode === 'study' && opt.isCorrect) cls += ' study-correct';
                 
-                const clickAttr = mode === 'exam' ? `onclick="handleOptionSelect(${qIdx}, ${oIdx})"` : '';
+                // Logic tô màu
+                if (mode === 'study' && opt.isCorrect) cls += ' study-correct';
+                if (isReview) {
+                    if (opt.isCorrect) cls += ' review-correct';
+                    // Tô đỏ lựa chọn sai của người dùng trước đó
+                    if (q.userSelected === oIdx && !opt.isCorrect) cls += ' review-wrong';
+                }
+                
+                // Click event
+                const clickAttr = (mode === 'exam' && !isReview) ? `onclick="handleOptionSelect(${qIdx}, ${oIdx})"` : '';
                 html += `<div class="${cls}" id="opt_${qIdx}_${oIdx}" ${clickAttr}>${opt.text}</div>`;
             });
             div.innerHTML = html;
             container.appendChild(div);
         });
-    };
+    }
 
     window.handleOptionSelect = (qIdx, oIdx) => {
         const parent = document.getElementById(`q_${qIdx}`);
@@ -678,11 +820,15 @@ B. Đà Nẵng"></textarea>
         activeQuestions[qIdx].userSelected = oIdx;
     };
 
-    window.submitQuiz = () => {
-        const unanswered = activeQuestions.filter(q => q.userSelected === null);
-        if(unanswered.length > 0) {
-            if(!confirm(`Còn ${unanswered.length} câu chưa làm. Nộp luôn không?`)) return;
+    window.submitQuiz = (force = false) => {
+        if(!force) {
+            const unanswered = activeQuestions.filter(q => q.userSelected === null);
+            if(unanswered.length > 0) {
+                if(!confirm(`Còn ${unanswered.length} câu chưa làm. Nộp luôn?`)) return;
+            }
         }
+
+        stopTimer(); // Stop if running
 
         let score = 0;
         wrongQuestions = [];
@@ -691,6 +837,9 @@ B. Đà Nẵng"></textarea>
             const correctOptIdx = q.options.findIndex(o => o.isCorrect);
             const userOptIdx = q.userSelected;
 
+            // Save for review
+            const wq = JSON.parse(JSON.stringify(q)); 
+            
             if(userOptIdx !== null) {
                 const userEl = document.getElementById(`opt_${qIdx}_${userOptIdx}`);
                 if(userOptIdx === correctOptIdx) {
@@ -699,29 +848,25 @@ B. Đà Nẵng"></textarea>
                 } else {
                     userEl.classList.add('wrong');
                     document.getElementById(`opt_${qIdx}_${correctOptIdx}`).classList.add('correct');
-                    const wq = JSON.parse(JSON.stringify(q));
-                    wq.userSelected = null;
-                    wrongQuestions.push(wq);
+                    wrongQuestions.push(wq); // Add to wrong list with user selection preserved
                 }
             } else {
                 document.getElementById(`opt_${qIdx}_${correctOptIdx}`).classList.add('correct');
-                const wq = JSON.parse(JSON.stringify(q));
+                // Add missed questions to wrong list too
+                wq.userSelected = -1; // Mark as missed
                 wrongQuestions.push(wq);
             }
-            
             document.getElementById(`q_${qIdx}`).querySelectorAll('.quiz-option').forEach(el => el.onclick = null);
         });
 
         setTimeout(() => {
             document.getElementById('lib-quiz-interface').classList.add('hidden');
             document.getElementById('lib-result-interface').classList.remove('hidden');
-            
             document.getElementById('scoreValue').innerText = `${score}/${activeQuestions.length}`;
-            
             const btnRetry = document.getElementById('retryWrongBtn');
             if(wrongQuestions.length > 0) {
                 btnRetry.style.display = 'block';
-                btnRetry.innerText = `🔁 Làm lại ${wrongQuestions.length} câu sai`;
+                btnRetry.innerText = `🔁 Xem & Làm lại ${wrongQuestions.length} câu sai`;
             } else {
                 btnRetry.style.display = 'none';
                 document.getElementById('scoreMsg').innerText = "Tuyệt vời! Đúng hết rồi.";
@@ -729,40 +874,27 @@ B. Đà Nẵng"></textarea>
         }, 800);
     };
 
-    window.retryWrong = () => {
+    // --- NEW: REVIEW & RETRY LOGIC ---
+    window.reviewWrong = () => {
+        // 1. Show Review Mode (Static, showing Correct/Wrong)
+        renderQuizInterface('exam', wrongQuestions, true);
+    };
+
+    window.continueToRetry = () => {
+        // 2. Start Retry Exam (Interactive, clear previous selections)
         activeQuestions = JSON.parse(JSON.stringify(wrongQuestions));
-        
-        document.getElementById('lib-result-interface').classList.add('hidden');
-        document.getElementById('lib-quiz-interface').classList.remove('hidden');
-        document.getElementById('quizProgress').innerText = `0/${activeQuestions.length}`;
-        
-        const container = document.getElementById('quizQuestionsContainer');
-        container.innerHTML = '';
-
-        activeQuestions.forEach((q, qIdx) => {
-            const div = document.createElement('div');
-            div.className = 'quiz-item';
-            div.style.padding = '15px';
-            div.style.borderBottom = '1px solid #eee';
-            div.id = `q_${qIdx}`;
-
-            let html = `<div class="quiz-question">Câu sai ${qIdx + 1}. ${q.text}</div>`;
-            q.options.forEach((opt, oIdx) => {
-                html += `<div class="quiz-option" id="opt_${qIdx}_${oIdx}" onclick="handleOptionSelect(${qIdx}, ${oIdx})">${opt.text}</div>`;
-            });
-            div.innerHTML = html;
-            container.appendChild(div);
-        });
+        activeQuestions.forEach(q => q.userSelected = null); // Reset selection for new attempt
+        renderQuizInterface('exam', activeQuestions, false);
     };
 
     window.quitQuiz = () => {
+        stopTimer();
         document.getElementById('lib-quiz-interface').classList.add('hidden');
         document.getElementById('lib-result-interface').classList.add('hidden');
         document.getElementById('lib-pre-quiz').classList.remove('hidden');
     };
 
     initApp();
-
 </script>
 </body>
 </html>
