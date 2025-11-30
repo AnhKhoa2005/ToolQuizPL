@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tool Quiz Master Online</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-dark: #4338ca;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: var(--card);
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            height: 90vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* --- HEADER & TABS --- */
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+            background: #fff;
+        }
+
+        .server-status {
+            font-size: 13px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            background: #fee2e2;
+            color: #991b1b;
+            cursor: pointer;
+            font-weight: 600;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .server-status.online { background: #dcfce7; color: #166534; }
+
+        .tabs { display: flex; background: #f1f5f9; padding: 4px; border-radius: 8px; gap: 4px; }
+        .tab-btn {
+            flex: 1; padding: 10px; border: none; background: transparent;
+            font-weight: 600; color: #64748b; cursor: pointer; border-radius: 6px;
+            transition: 0.2s;
+        }
+        .tab-btn.active { background: #fff; color: var(--primary); shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+        /* --- SECTIONS --- */
+        .section { display: none; padding: 20px; flex: 1; overflow-y: auto; flex-direction: column; }
+        .section.active { display: flex; }
+
+        /* --- INPUTS & BUTTONS --- */
+        textarea {
+            width: 100%; height: 200px; padding: 15px;
+            border: 2px solid var(--border); border-radius: 8px;
+            font-family: monospace; font-size: 14px; resize: vertical;
+            margin-bottom: 15px; box-sizing: border-box;
+        }
+        textarea:focus { outline: none; border-color: var(--primary); }
+
+        input[type="text"] {
+            width: 100%; padding: 12px; margin-bottom: 15px;
+            border: 2px solid var(--border); border-radius: 8px;
+            font-size: 16px; box-sizing: border-box;
+        }
+
+        .btn {
+            padding: 10px 20px; border-radius: 8px; border: none;
+            font-weight: 600; cursor: pointer; transition: 0.2s;
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-outline { background: transparent; border: 2px solid var(--border); color: #64748b; }
+        .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+        .btn-icon { padding: 8px; border-radius: 50%; width: 36px; height: 36px; }
+
+        /* --- CREATOR MODE --- */
+        .question-block {
+            background: #f8fafc; padding: 15px; border-radius: 8px;
+            margin-bottom: 10px; border: 1px solid var(--border);
+        }
+        .opt-label { display: flex; align-items: center; padding: 6px; cursor: pointer; }
+        .opt-label:hover { background: #e2e8f0; border-radius: 4px; }
+        .opt-label input { margin-right: 10px; transform: scale(1.2); }
+
+        /* --- QUIZ LIST --- */
+        .quiz-list { display: grid; gap: 10px; }
+        .quiz-card {
+            background: #fff; border: 1px solid var(--border); padding: 15px;
+            border-radius: 8px; display: flex; justify-content: space-between; align-items: center;
+            transition: 0.2s; cursor: pointer; gap: 15px;
+        }
+        .quiz-card:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .quiz-info { flex: 1; }
+        .quiz-info h3 { margin: 0 0 5px 0; font-size: 16px; color: var(--text); }
+        .quiz-meta { font-size: 12px; color: #64748b; }
+        
+        .delete-btn {
+            background: #fee2e2; color: #ef4444; border: none;
+            padding: 8px 12px; border-radius: 6px; font-size: 14px; cursor: pointer;
+            transition: 0.2s; display: flex; align-items: center; gap: 5px;
+        }
+        .delete-btn:hover { background: #fecaca; }
+
+        /* --- QUIZ TAKING --- */
+        .quiz-option {
+            padding: 12px; margin: 8px 0; border: 2px solid var(--border);
+            border-radius: 8px; cursor: pointer; transition: 0.2s;
+        }
+        .quiz-option:hover { background: #f1f5f9; }
+        .quiz-option.selected { border-color: var(--primary); background: #e0e7ff; color: var(--primary); font-weight: bold; }
+        .quiz-option.correct { border-color: var(--success) !important; background: #dcfce7 !important; color: #15803d !important; }
+        .quiz-option.wrong { border-color: var(--danger) !important; background: #fee2e2 !important; color: #991b1b !important; }
+        .study-correct { border-color: var(--success); background: #dcfce7; font-weight: bold; }
+
+        /* --- TOGGLE SWITCH --- */
+        .toggle-switch { display: flex; align-items: center; gap: 10px; margin: 15px 0; cursor: pointer; }
+        .toggle-input { display: none; }
+        .toggle-slider {
+            width: 44px; height: 24px; background: #cbd5e1; border-radius: 20px;
+            position: relative; transition: 0.3s;
+        }
+        .toggle-slider::before {
+            content: ""; position: absolute; width: 18px; height: 18px;
+            background: white; border-radius: 50%; top: 3px; left: 3px; transition: 0.3s;
+        }
+        .toggle-input:checked + .toggle-slider { background: var(--primary); }
+        .toggle-input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+        /* --- RESULT --- */
+        .score-circle {
+            width: 120px; height: 120px; border-radius: 50%; background: var(--primary);
+            color: white; display: flex; align-items: center; justify-content: center;
+            font-size: 32px; font-weight: bold; margin: 0 auto 20px;
+        }
+
+        /* --- MODAL --- */
+        .modal-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 100;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 500px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+
+        .hidden { display: none !important; }
+        .sticky-footer {
+            margin-top: auto; padding-top: 15px; border-top: 1px solid var(--border);
+            display: flex; gap: 10px; justify-content: flex-end; background: #fff;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Header -->
+    <div class="header-bar">
+        <h2 style="margin:0; font-size:18px;">🎓 Quiz Master Pro</h2>
+        <div style="display:flex; gap:10px;">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('creator')">Tạo Quiz Mới</button>
+                <button class="tab-btn" onclick="switchTab('library')">Thư Viện Đề</button>
+            </div>
+            <button class="server-status" id="status-badge" onclick="openConfigModal()">⚙️ Kết nối Server</button>
+        </div>
+    </div>
+
+    <!-- TAB 1: CREATOR -->
+    <div id="creator" class="section active">
+        <!-- Step 1: Input -->
+        <div id="creator-step1">
+            <p style="color:#64748b; margin-top:0;">Dán câu hỏi và đáp án vào đây (Mỗi dòng 1 câu):</p>
+            <textarea id="rawInput" placeholder="Ví dụ:
+Câu 1: Thủ đô VN?
+Hà Nội
+Đà Nẵng"></textarea>
+            <div style="text-align: right;">
+                <button class="btn btn-primary" onclick="analyzeRaw()">Phân tích & Chọn đáp án ➡️</button>
+            </div>
+        </div>
+
+        <!-- Step 2: Select Answers -->
+        <div id="creator-step2" class="hidden">
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                <h3>Chọn đáp án đúng</h3>
+                <button class="btn btn-outline" onclick="resetCreator()">Quay lại</button>
+            </div>
+            <div id="selectionList" style="flex:1; overflow-y:auto; margin-bottom:15px;"></div>
+            
+            <div class="sticky-footer" style="flex-direction:column; gap:10px; align-items:stretch;">
+                <input type="text" id="quizNameInput" placeholder="Nhập tên bài Quiz (VD: Ôn tập chương 1)...">
+                <button class="btn btn-success" onclick="saveQuizToCloud()">💾 Lưu lên Server</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: LIBRARY (Học & Thi) -->
+    <div id="library" class="section">
+        <!-- List View -->
+        <div id="lib-list-view">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0;">Danh sách bài thi trên Server</h3>
+                <button class="btn btn-outline" onclick="refreshLibrary()">🔄 Làm mới</button>
+            </div>
+            <div id="quizListContainer" class="quiz-list">
+                <div style="text-align:center; color:#94a3b8; margin-top:50px;">
+                    Đang tải dữ liệu...<br>(Nếu lâu, hãy kiểm tra kết nối Server)
+                </div>
+            </div>
+        </div>
+
+        <!-- Pre-Quiz View (Chọn chế độ) -->
+        <div id="lib-pre-quiz" class="hidden">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <button class="btn btn-outline" onclick="backToLibrary()">⬅️ Quay lại thư viện</button>
+                <button class="btn btn-danger" onclick="deleteCurrentQuiz()">🗑️ Xóa bài này</button>
+            </div>
+            
+            <div style="text-align:center; margin-top:20px;">
+                <h2 id="currentQuizTitle" style="font-size:24px; color:var(--primary);">Tên bài thi</h2>
+                <p style="color:#64748b;" id="currentQuizMeta">Số câu hỏi: 0</p>
+                
+                <div style="background:#f1f5f9; padding:20px; border-radius:12px; display:inline-block; text-align:left; margin:20px 0;">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="randomToggle" class="toggle-input">
+                        <span class="toggle-slider"></span>
+                        <span style="font-weight:600;">Xáo trộn câu hỏi (Random)</span>
+                    </label>
+                </div>
+
+                <div style="display:flex; gap:15px; justify-content:center; margin-top:20px;">
+                    <button class="btn btn-success" onclick="startQuiz('study')" style="padding:15px 30px; font-size:18px;">📖 Vào Học (Hiện đáp án)</button>
+                    <button class="btn btn-primary" onclick="startQuiz('exam')" style="padding:15px 30px; font-size:18px;">📝 Làm Bài Thi</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quiz Interface -->
+        <div id="lib-quiz-interface" class="hidden">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; background:#e0e7ff; padding:10px 15px; border-radius:8px;">
+                <span style="font-weight:bold; color:var(--primary);" id="quizModeLabel">CHẾ ĐỘ THI</span>
+                <span id="quizProgress">0/0</span>
+            </div>
+            
+            <div id="quizQuestionsContainer" style="flex:1; overflow-y:auto;"></div>
+
+            <div class="sticky-footer">
+                <button class="btn btn-danger" onclick="quitQuiz()">Thoát</button>
+                <button class="btn btn-success" id="submitBtn" onclick="submitQuiz()">Nộp Bài 🏁</button>
+            </div>
+        </div>
+
+        <!-- Result Interface -->
+        <div id="lib-result-interface" class="hidden">
+            <div class="result-panel">
+                <h2>Kết Quả</h2>
+                <div class="score-circle" id="scoreValue">0/0</div>
+                <p id="scoreMsg" style="margin-bottom:30px; font-size:18px;">Cố lên!</p>
+                
+                <div style="display:flex; gap:10px; justify-content:center;">
+                    <button class="btn btn-danger" id="retryWrongBtn" onclick="retryWrong()" style="display:none;">🔁 Làm lại câu sai</button>
+                    <button class="btn btn-outline" onclick="backToLibrary()">📂 Chọn bài khác</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONFIG MODAL -->
+    <div id="config-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 style="margin-top:0;">Cấu Hình Firebase</h3>
+            <p style="font-size:13px; color:#666;">Dán mã <code>const firebaseConfig = {...}</code> vào đây:</p>
+            <textarea id="configInput" style="height:120px;"></textarea>
+            <div style="text-align:right; margin-top:10px;">
+                <button class="btn btn-outline" onclick="closeModal()">Đóng</button>
+                <button class="btn btn-primary" onclick="saveConfig()">Lưu & Kết nối</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- FIREBASE LOGIC -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    let db;
+    let isFirebaseReady = false;
+    let currentRawData = [];
+    let libraryData = []; // Cache list quiz
+    let activeQuiz = null; // Quiz đang làm
+    let activeQuestions = []; // Câu hỏi đang làm (đã shuffle hoặc chưa)
+    let wrongQuestions = []; // List câu sai
+
+    // --- GLOBAL FUNCTIONS (Expose to window) ---
+    window.switchTab = (tab) => {
+        document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tab).classList.add('active');
+        document.querySelector(`.tab-btn[onclick="switchTab('${tab}')"]`).classList.add('active');
+        if(tab === 'library') refreshLibrary();
+    };
+
+    window.openConfigModal = () => {
+        document.getElementById('config-modal').classList.add('open');
+        document.getElementById('configInput').value = localStorage.getItem('fb_config_str') || '';
+    };
+    window.closeModal = () => document.getElementById('config-modal').classList.remove('open');
+
+    window.saveConfig = () => {
+        const input = document.getElementById('configInput').value.trim();
+        try {
+            // Parse config object manually from string
+            const configObj = {};
+            const keys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
+            keys.forEach(key => {
+                const match = input.match(new RegExp(`${key}:\\s*["']([^"']+)["']`));
+                if(match) configObj[key] = match[1];
+            });
+            
+            if(!configObj.apiKey) throw new Error("Không tìm thấy Config hợp lệ");
+
+            localStorage.setItem('fb_config', JSON.stringify(configObj));
+            localStorage.setItem('fb_config_str', input);
+            location.reload();
+        } catch(e) {
+            alert("Lỗi config: " + e.message);
+        }
+    };
+
+    // --- FIREBASE INIT ---
+    async function initApp() {
+        const configStr = localStorage.getItem('fb_config');
+        if(!configStr) {
+            document.getElementById('status-badge').innerText = "⚙️ Chưa kết nối";
+            return;
+        }
+        try {
+            const app = initializeApp(JSON.parse(configStr));
+            db = getFirestore(app);
+            isFirebaseReady = true;
+            document.getElementById('status-badge').innerText = "🟢 Đã kết nối";
+            document.getElementById('status-badge').classList.add('online');
+            refreshLibrary(); // Load ngay khi init
+        } catch(e) {
+            console.error(e);
+            alert("Lỗi kết nối Firebase!");
+        }
+    }
+
+    // --- CREATOR LOGIC ---
+    window.analyzeRaw = () => {
+        const text = document.getElementById('rawInput').value;
+        const lines = text.split('\n').filter(l => l.trim());
+        currentRawData = [];
+        let currentQ = null;
+
+        lines.forEach(line => {
+            line = line.trim();
+            // Detect question: Starts with "Câu", number., or ends with ?
+            const isQ = /^(Câu|Bài)\s/i.test(line) || /^\d+[\.:]/.test(line) || line.endsWith('?');
+            // Clean bullets
+            const cleanText = line.replace(/^[·\-\+\•]\s*/, '');
+
+            if(isQ) {
+                if(currentQ) currentRawData.push(currentQ);
+                currentQ = { text: cleanText, options: [], correctIdx: 0 };
+            } else {
+                if(currentQ) currentQ.options.push(cleanText);
+            }
+        });
+        if(currentQ) currentRawData.push(currentQ);
+
+        if(currentRawData.length === 0) { alert("Không tìm thấy câu hỏi!"); return; }
+        
+        // Render step 2
+        const container = document.getElementById('selectionList');
+        container.innerHTML = '';
+        currentRawData.forEach((q, qIdx) => {
+            const div = document.createElement('div');
+            div.className = 'question-block';
+            let html = `<div style="font-weight:bold; margin-bottom:8px;">${q.text}</div>`;
+            q.options.forEach((opt, oIdx) => {
+                html += `<label class="opt-label">
+                    <input type="radio" name="q_${qIdx}" ${oIdx===0?'checked':''} onchange="updateCorrect(${qIdx}, ${oIdx})"> ${opt}
+                </label>`;
+            });
+            div.innerHTML = html;
+            container.appendChild(div);
+        });
+
+        document.getElementById('creator-step1').classList.add('hidden');
+        document.getElementById('creator-step2').classList.remove('hidden');
+    };
+
+    window.updateCorrect = (qIdx, oIdx) => { currentRawData[qIdx].correctIdx = oIdx; };
+    window.resetCreator = () => {
+        document.getElementById('creator-step1').classList.remove('hidden');
+        document.getElementById('creator-step2').classList.add('hidden');
+    };
+
+    window.saveQuizToCloud = async () => {
+        if(!isFirebaseReady) { alert("Vui lòng kết nối Server trước!"); return; }
+        const name = document.getElementById('quizNameInput').value.trim();
+        if(!name) { alert("Nhập tên bài Quiz!"); return; }
+
+        try {
+            // Format data for saving: Store correct answers securely or simpler structure
+            // Structure: { name, questions: [{text, options: [{text, isCorrect}]}] }
+            const questionsToSave = currentRawData.map(q => ({
+                text: q.text,
+                options: q.options.map((opt, idx) => ({
+                    text: opt,
+                    isCorrect: idx === q.correctIdx
+                }))
+            }));
+
+            await addDoc(collection(db, "quizzes"), {
+                name: name,
+                questions: questionsToSave,
+                createdAt: Date.now()
+            });
+
+            alert("Đã lưu thành công!");
+            document.getElementById('rawInput').value = '';
+            document.getElementById('quizNameInput').value = '';
+            resetCreator();
+            switchTab('library'); // Chuyển sang xem luôn
+        } catch(e) {
+            alert("Lỗi lưu: " + e.message);
+        }
+    };
+
+    // --- LIBRARY LOGIC ---
+    window.refreshLibrary = async () => {
+        if(!isFirebaseReady) {
+            document.getElementById('quizListContainer').innerHTML = '<div style="text-align:center; padding:20px;">Chưa kết nối Server (Offline)</div>';
+            return;
+        }
+        
+        try {
+            const snapshot = await getDocs(collection(db, "quizzes"));
+            libraryData = [];
+            const container = document.getElementById('quizListContainer');
+            container.innerHTML = '';
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                libraryData.push({ id: doc.id, ...data });
+                
+                const card = document.createElement('div');
+                card.className = 'quiz-card';
+                card.innerHTML = `
+                    <div class="quiz-info" onclick="selectQuiz('${doc.id}')">
+                        <h3>${data.name}</h3>
+                        <div class="quiz-meta">${data.questions.length} câu hỏi • ${new Date(data.createdAt).toLocaleDateString()}</div>
+                    </div>
+                    <button class="delete-btn" onclick="deleteQuiz(event, '${doc.id}')">🗑️ Xóa</button>
+                `;
+                container.appendChild(card);
+            });
+
+            if(libraryData.length === 0) container.innerHTML = '<div style="text-align:center;">Trống trơn! Hãy tạo quiz mới.</div>';
+
+        } catch(e) {
+            console.error(e);
+            if(e.code === 'permission-denied') alert("Lỗi quyền! Hãy bật Test Mode trong Firestore Rules.");
+        }
+    };
+
+    window.deleteQuiz = async (e, id) => {
+        e.stopPropagation(); // Ngăn việc click xóa lại mở quiz
+        if(!confirm("CẢNH BÁO: Bạn có chắc chắn muốn xóa bài thi này không?")) return;
+        await deleteDoc(doc(db, "quizzes", id));
+        refreshLibrary();
+    };
+    
+    window.deleteCurrentQuiz = async () => {
+        if(!activeQuiz) return;
+        if(!confirm(`Xóa bài "${activeQuiz.name}"?`)) return;
+        await deleteDoc(doc(db, "quizzes", activeQuiz.id));
+        backToLibrary();
+        refreshLibrary();
+    };
+
+    window.selectQuiz = (id) => {
+        activeQuiz = libraryData.find(q => q.id === id);
+        if(!activeQuiz) return;
+
+        document.getElementById('lib-list-view').classList.add('hidden');
+        document.getElementById('lib-pre-quiz').classList.remove('hidden');
+        
+        document.getElementById('currentQuizTitle').innerText = activeQuiz.name;
+        document.getElementById('currentQuizMeta').innerText = `Tổng số: ${activeQuiz.questions.length} câu`;
+        document.getElementById('randomToggle').checked = false; // Reset toggle
+    };
+
+    window.backToLibrary = () => {
+        document.getElementById('lib-pre-quiz').classList.add('hidden');
+        document.getElementById('lib-result-interface').classList.add('hidden');
+        document.getElementById('lib-list-view').classList.remove('hidden');
+    };
+
+    // --- QUIZ TAKING LOGIC ---
+    window.startQuiz = (mode) => { // mode: 'study' or 'exam'
+        const isRandom = document.getElementById('randomToggle').checked;
+        
+        // Deep copy questions
+        activeQuestions = JSON.parse(JSON.stringify(activeQuiz.questions));
+        
+        // Add original index tracking if needed, but simple is ok
+        // Randomize if checked
+        if(isRandom && mode === 'exam') {
+            activeQuestions.sort(() => Math.random() - 0.5);
+        }
+
+        // Add userSelected property
+        activeQuestions.forEach(q => q.userSelected = null);
+
+        // Render UI
+        document.getElementById('lib-pre-quiz').classList.add('hidden');
+        document.getElementById('lib-quiz-interface').classList.remove('hidden');
+        document.getElementById('lib-result-interface').classList.add('hidden');
+
+        document.getElementById('quizModeLabel').innerText = mode === 'study' ? '📖 CHẾ ĐỘ HỌC' : '📝 CHẾ ĐỘ THI';
+        document.getElementById('quizProgress').innerText = `0/${activeQuestions.length}`;
+        document.getElementById('submitBtn').style.display = mode === 'study' ? 'none' : 'block';
+
+        const container = document.getElementById('quizQuestionsContainer');
+        container.innerHTML = '';
+
+        activeQuestions.forEach((q, qIdx) => {
+            const div = document.createElement('div');
+            div.className = 'quiz-item';
+            div.style.padding = '15px';
+            div.style.borderBottom = '1px solid #eee';
+            div.id = `q_${qIdx}`;
+
+            let html = `<div class="quiz-question">${qIdx + 1}. ${q.text}</div>`;
+            q.options.forEach((opt, oIdx) => {
+                let cls = 'quiz-option';
+                if(mode === 'study' && opt.isCorrect) cls += ' study-correct';
+                
+                // Onclick only for exam mode
+                const clickAttr = mode === 'exam' ? `onclick="handleOptionSelect(${qIdx}, ${oIdx})"` : '';
+                html += `<div class="${cls}" id="opt_${qIdx}_${oIdx}" ${clickAttr}>${opt.text}</div>`;
+            });
+            div.innerHTML = html;
+            container.appendChild(div);
+        });
+    };
+
+    window.handleOptionSelect = (qIdx, oIdx) => {
+        // UI Update
+        const parent = document.getElementById(`q_${qIdx}`);
+        parent.querySelectorAll('.quiz-option').forEach(el => el.classList.remove('selected'));
+        document.getElementById(`opt_${qIdx}_${oIdx}`).classList.add('selected');
+        
+        // Logic Update
+        activeQuestions[qIdx].userSelected = oIdx;
+    };
+
+    window.submitQuiz = () => {
+        // Check unanswered
+        const unanswered = activeQuestions.filter(q => q.userSelected === null);
+        if(unanswered.length > 0) {
+            if(!confirm(`Còn ${unanswered.length} câu chưa làm. Nộp luôn không?`)) return;
+        }
+
+        let score = 0;
+        wrongQuestions = [];
+
+        activeQuestions.forEach((q, qIdx) => {
+            const correctOptIdx = q.options.findIndex(o => o.isCorrect);
+            const userOptIdx = q.userSelected;
+
+            // Highlight UI
+            if(userOptIdx !== null) {
+                const userEl = document.getElementById(`opt_${qIdx}_${userOptIdx}`);
+                if(userOptIdx === correctOptIdx) {
+                    userEl.classList.add('correct');
+                    score++;
+                } else {
+                    userEl.classList.add('wrong');
+                    // Highlight correct one
+                    document.getElementById(`opt_${qIdx}_${correctOptIdx}`).classList.add('correct');
+                    
+                    // Add to wrong list for retry
+                    // Clone question and reset selection
+                    const wq = JSON.parse(JSON.stringify(q));
+                    wq.userSelected = null;
+                    wrongQuestions.push(wq);
+                }
+            } else {
+                // Highlight missed correct answer
+                document.getElementById(`opt_${qIdx}_${correctOptIdx}`).classList.add('correct');
+                const wq = JSON.parse(JSON.stringify(q));
+                wrongQuestions.push(wq);
+            }
+            
+            // Disable clicks
+            document.getElementById(`q_${qIdx}`).querySelectorAll('.quiz-option').forEach(el => el.onclick = null);
+        });
+
+        // Show result
+        setTimeout(() => {
+            document.getElementById('lib-quiz-interface').classList.add('hidden');
+            document.getElementById('lib-result-interface').classList.remove('hidden');
+            
+            document.getElementById('scoreValue').innerText = `${score}/${activeQuestions.length}`;
+            
+            const btnRetry = document.getElementById('retryWrongBtn');
+            if(wrongQuestions.length > 0) {
+                btnRetry.style.display = 'block';
+                btnRetry.innerText = `🔁 Làm lại ${wrongQuestions.length} câu sai`;
+            } else {
+                btnRetry.style.display = 'none';
+                document.getElementById('scoreMsg').innerText = "Tuyệt vời! Đúng hết rồi.";
+            }
+        }, 800);
+    };
+
+    window.retryWrong = () => {
+        // Set active questions to wrong list
+        activeQuestions = JSON.parse(JSON.stringify(wrongQuestions));
+        
+        // Re-render UI (Exam mode logic)
+        document.getElementById('lib-result-interface').classList.add('hidden');
+        document.getElementById('lib-quiz-interface').classList.remove('hidden');
+        document.getElementById('quizProgress').innerText = `0/${activeQuestions.length}`;
+        
+        const container = document.getElementById('quizQuestionsContainer');
+        container.innerHTML = '';
+
+        activeQuestions.forEach((q, qIdx) => {
+            const div = document.createElement('div');
+            div.className = 'quiz-item';
+            div.style.padding = '15px';
+            div.style.borderBottom = '1px solid #eee';
+            div.id = `q_${qIdx}`;
+
+            let html = `<div class="quiz-question">Câu sai ${qIdx + 1}. ${q.text}</div>`;
+            q.options.forEach((opt, oIdx) => {
+                html += `<div class="quiz-option" id="opt_${qIdx}_${oIdx}" onclick="handleOptionSelect(${qIdx}, ${oIdx})">${opt.text}</div>`;
+            });
+            div.innerHTML = html;
+            container.appendChild(div);
+        });
+    };
+
+    window.quitQuiz = () => {
+        document.getElementById('lib-quiz-interface').classList.add('hidden');
+        document.getElementById('lib-result-interface').classList.add('hidden');
+        document.getElementById('lib-pre-quiz').classList.remove('hidden');
+    };
+
+    // Init
+    initApp();
+
+</script>
+</body>
+</html>
