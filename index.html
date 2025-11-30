@@ -126,12 +126,21 @@
         .quiz-info h3 { margin: 0 0 5px 0; font-size: 16px; color: var(--text); }
         .quiz-meta { font-size: 12px; color: #64748b; }
         
+        .action-group { display: flex; gap: 8px; }
+        
         .delete-btn {
             background: #fee2e2; color: #ef4444; border: none;
             padding: 8px 12px; border-radius: 6px; font-size: 14px; cursor: pointer;
             transition: 0.2s; display: flex; align-items: center; gap: 5px;
         }
         .delete-btn:hover { background: #fecaca; }
+
+        .export-btn {
+            background: #e0e7ff; color: var(--primary); border: none;
+            padding: 8px 12px; border-radius: 6px; font-size: 14px; cursor: pointer;
+            transition: 0.2s; display: flex; align-items: center; gap: 5px;
+        }
+        .export-btn:hover { background: #c7d2fe; }
 
         /* --- QUIZ TAKING --- */
         .quiz-option {
@@ -171,7 +180,7 @@
             background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 100;
         }
         .modal-overlay.open { display: flex; }
-        .modal-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 500px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .modal-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 500px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
 
         .hidden { display: none !important; }
         .sticky-footer {
@@ -219,7 +228,10 @@ Hà Nội
             
             <div class="sticky-footer" style="flex-direction:column; gap:10px; align-items:stretch;">
                 <input type="text" id="quizNameInput" placeholder="Nhập tên bài Quiz (VD: Ôn tập chương 1)...">
-                <button class="btn btn-success" onclick="saveQuizToCloud()">💾 Lưu lên Server</button>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-outline" style="flex:1;" onclick="exportTextFormat()">📋 Xuất Format Text</button>
+                    <button class="btn btn-success" style="flex:1;" onclick="saveQuizToCloud()">💾 Lưu lên Server</button>
+                </div>
             </div>
         </div>
     </div>
@@ -302,8 +314,21 @@ Hà Nội
             <p style="font-size:13px; color:#666;">Dán mã <code>const firebaseConfig = {...}</code> vào đây:</p>
             <textarea id="configInput" style="height:120px;"></textarea>
             <div style="text-align:right; margin-top:10px;">
-                <button class="btn btn-outline" onclick="closeModal()">Đóng</button>
+                <button class="btn btn-outline" onclick="closeModal('config-modal')">Đóng</button>
                 <button class="btn btn-primary" onclick="saveConfig()">Lưu & Kết nối</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- EXPORT MODAL -->
+    <div id="export-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 style="margin-top:0;">Xuất Dữ Liệu Text</h3>
+            <p style="font-size:13px; color:#666;">Copy nội dung dưới đây:</p>
+            <textarea id="exportInput" style="height:300px; font-family:monospace;"></textarea>
+            <div style="text-align:right; margin-top:10px;">
+                <button class="btn btn-outline" onclick="closeModal('export-modal')">Đóng</button>
+                <button class="btn btn-primary" onclick="copyExportText()">Copy</button>
             </div>
         </div>
     </div>
@@ -335,7 +360,11 @@ Hà Nội
         document.getElementById('config-modal').classList.add('open');
         document.getElementById('configInput').value = localStorage.getItem('fb_config_str') || '';
     };
-    window.closeModal = () => document.getElementById('config-modal').classList.remove('open');
+    
+    window.closeModal = (id) => {
+        const modalId = id || 'config-modal';
+        document.getElementById(modalId).classList.remove('open');
+    };
 
     window.saveConfig = () => {
         const input = document.getElementById('configInput').value.trim();
@@ -429,14 +458,79 @@ Hà Nội
         document.getElementById('creator-step2').classList.add('hidden');
     };
 
+    // --- NEW: EXPORT TEXT FEATURE ---
+    window.exportTextFormat = () => {
+        if (!currentRawData || currentRawData.length === 0) {
+            alert("Chưa có dữ liệu để xuất!");
+            return;
+        }
+
+        let output = "";
+        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+        currentRawData.forEach((q, index) => {
+            // Đảm bảo có tiền tố Câu hỏi
+            let qText = q.text;
+            if(!qText.match(/^(Câu|Bài)\s+\d+/i)) {
+                 qText = `Câu hỏi ${index + 1}: ${qText}`;
+            }
+            
+            output += `${qText}\n`;
+            q.options.forEach((opt, optIdx) => {
+                const isCorrect = optIdx === q.correctIdx;
+                const symbol = isCorrect ? "+" : "-";
+                const letter = alphabet[optIdx] || "?";
+                output += `${symbol} ${letter} ${opt}\n`;
+            });
+            output += "\n"; 
+        });
+
+        document.getElementById('export-modal').classList.add('open');
+        document.getElementById('exportInput').value = output;
+    };
+
+    // --- NEW: EXPORT LIBRARY QUIZ ---
+    window.exportLibraryQuiz = (e, id) => {
+        e.stopPropagation();
+        const quiz = libraryData.find(q => q.id === id);
+        if(!quiz) return;
+
+        let output = "";
+        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+        quiz.questions.forEach((q, index) => {
+            let qText = q.text;
+            if(!qText.match(/^(Câu|Bài)\s+\d+/i)) {
+                 qText = `Câu hỏi ${index + 1}: ${qText}`;
+            }
+            
+            output += `${qText}\n`;
+            q.options.forEach((opt, optIdx) => {
+                const isCorrect = opt.isCorrect;
+                const symbol = isCorrect ? "+" : "-";
+                const letter = alphabet[optIdx] || "?";
+                output += `${symbol} ${letter} ${opt.text}\n`;
+            });
+            output += "\n";
+        });
+
+        document.getElementById('export-modal').classList.add('open');
+        document.getElementById('exportInput').value = output;
+    };
+
+    window.copyExportText = () => {
+        const el = document.getElementById('exportInput');
+        el.select();
+        document.execCommand('copy');
+        alert("Đã copy vào bộ nhớ đệm!");
+    };
+
     window.saveQuizToCloud = async () => {
         if(!isFirebaseReady) { alert("Vui lòng kết nối Server trước!"); return; }
         const name = document.getElementById('quizNameInput').value.trim();
         if(!name) { alert("Nhập tên bài Quiz!"); return; }
 
         try {
-            // Format data for saving: Store correct answers securely or simpler structure
-            // Structure: { name, questions: [{text, options: [{text, isCorrect}]}] }
             const questionsToSave = currentRawData.map(q => ({
                 text: q.text,
                 options: q.options.map((opt, idx) => ({
@@ -455,7 +549,7 @@ Hà Nội
             document.getElementById('rawInput').value = '';
             document.getElementById('quizNameInput').value = '';
             resetCreator();
-            switchTab('library'); // Chuyển sang xem luôn
+            switchTab('library'); 
         } catch(e) {
             alert("Lỗi lưu: " + e.message);
         }
@@ -485,7 +579,10 @@ Hà Nội
                         <h3>${data.name}</h3>
                         <div class="quiz-meta">${data.questions.length} câu hỏi • ${new Date(data.createdAt).toLocaleDateString()}</div>
                     </div>
-                    <button class="delete-btn" onclick="deleteQuiz(event, '${doc.id}')">🗑️ Xóa</button>
+                    <div class="action-group">
+                        <button class="export-btn" onclick="exportLibraryQuiz(event, '${doc.id}')">📋 Xuất</button>
+                        <button class="delete-btn" onclick="deleteQuiz(event, '${doc.id}')">🗑️ Xóa</button>
+                    </div>
                 `;
                 container.appendChild(card);
             });
@@ -499,7 +596,7 @@ Hà Nội
     };
 
     window.deleteQuiz = async (e, id) => {
-        e.stopPropagation(); // Ngăn việc click xóa lại mở quiz
+        e.stopPropagation(); 
         if(!confirm("CẢNH BÁO: Bạn có chắc chắn muốn xóa bài thi này không?")) return;
         await deleteDoc(doc(db, "quizzes", id));
         refreshLibrary();
@@ -522,7 +619,7 @@ Hà Nội
         
         document.getElementById('currentQuizTitle').innerText = activeQuiz.name;
         document.getElementById('currentQuizMeta').innerText = `Tổng số: ${activeQuiz.questions.length} câu`;
-        document.getElementById('randomToggle').checked = false; // Reset toggle
+        document.getElementById('randomToggle').checked = false; 
     };
 
     window.backToLibrary = () => {
@@ -532,22 +629,17 @@ Hà Nội
     };
 
     // --- QUIZ TAKING LOGIC ---
-    window.startQuiz = (mode) => { // mode: 'study' or 'exam'
+    window.startQuiz = (mode) => { 
         const isRandom = document.getElementById('randomToggle').checked;
         
-        // Deep copy questions
         activeQuestions = JSON.parse(JSON.stringify(activeQuiz.questions));
         
-        // Add original index tracking if needed, but simple is ok
-        // Randomize if checked
         if(isRandom && mode === 'exam') {
             activeQuestions.sort(() => Math.random() - 0.5);
         }
 
-        // Add userSelected property
         activeQuestions.forEach(q => q.userSelected = null);
 
-        // Render UI
         document.getElementById('lib-pre-quiz').classList.add('hidden');
         document.getElementById('lib-quiz-interface').classList.remove('hidden');
         document.getElementById('lib-result-interface').classList.add('hidden');
@@ -571,7 +663,6 @@ Hà Nội
                 let cls = 'quiz-option';
                 if(mode === 'study' && opt.isCorrect) cls += ' study-correct';
                 
-                // Onclick only for exam mode
                 const clickAttr = mode === 'exam' ? `onclick="handleOptionSelect(${qIdx}, ${oIdx})"` : '';
                 html += `<div class="${cls}" id="opt_${qIdx}_${oIdx}" ${clickAttr}>${opt.text}</div>`;
             });
@@ -581,17 +672,13 @@ Hà Nội
     };
 
     window.handleOptionSelect = (qIdx, oIdx) => {
-        // UI Update
         const parent = document.getElementById(`q_${qIdx}`);
         parent.querySelectorAll('.quiz-option').forEach(el => el.classList.remove('selected'));
         document.getElementById(`opt_${qIdx}_${oIdx}`).classList.add('selected');
-        
-        // Logic Update
         activeQuestions[qIdx].userSelected = oIdx;
     };
 
     window.submitQuiz = () => {
-        // Check unanswered
         const unanswered = activeQuestions.filter(q => q.userSelected === null);
         if(unanswered.length > 0) {
             if(!confirm(`Còn ${unanswered.length} câu chưa làm. Nộp luôn không?`)) return;
@@ -604,7 +691,6 @@ Hà Nội
             const correctOptIdx = q.options.findIndex(o => o.isCorrect);
             const userOptIdx = q.userSelected;
 
-            // Highlight UI
             if(userOptIdx !== null) {
                 const userEl = document.getElementById(`opt_${qIdx}_${userOptIdx}`);
                 if(userOptIdx === correctOptIdx) {
@@ -612,27 +698,20 @@ Hà Nội
                     score++;
                 } else {
                     userEl.classList.add('wrong');
-                    // Highlight correct one
                     document.getElementById(`opt_${qIdx}_${correctOptIdx}`).classList.add('correct');
-                    
-                    // Add to wrong list for retry
-                    // Clone question and reset selection
                     const wq = JSON.parse(JSON.stringify(q));
                     wq.userSelected = null;
                     wrongQuestions.push(wq);
                 }
             } else {
-                // Highlight missed correct answer
                 document.getElementById(`opt_${qIdx}_${correctOptIdx}`).classList.add('correct');
                 const wq = JSON.parse(JSON.stringify(q));
                 wrongQuestions.push(wq);
             }
             
-            // Disable clicks
             document.getElementById(`q_${qIdx}`).querySelectorAll('.quiz-option').forEach(el => el.onclick = null);
         });
 
-        // Show result
         setTimeout(() => {
             document.getElementById('lib-quiz-interface').classList.add('hidden');
             document.getElementById('lib-result-interface').classList.remove('hidden');
@@ -651,10 +730,8 @@ Hà Nội
     };
 
     window.retryWrong = () => {
-        // Set active questions to wrong list
         activeQuestions = JSON.parse(JSON.stringify(wrongQuestions));
         
-        // Re-render UI (Exam mode logic)
         document.getElementById('lib-result-interface').classList.add('hidden');
         document.getElementById('lib-quiz-interface').classList.remove('hidden');
         document.getElementById('quizProgress').innerText = `0/${activeQuestions.length}`;
@@ -684,7 +761,6 @@ Hà Nội
         document.getElementById('lib-pre-quiz').classList.remove('hidden');
     };
 
-    // Init
     initApp();
 
 </script>
