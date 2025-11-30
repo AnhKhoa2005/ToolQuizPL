@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tool Quiz Master Online</title>
+    <title>Tool Quiz Master Online (V6 - Fix Lặp)</title>
     <style>
         :root {
             --primary: #4f46e5;
@@ -208,11 +208,11 @@
     <div id="creator" class="section active">
         <!-- Step 1: Input -->
         <div id="creator-step1">
-            <p style="color:#64748b; margin-top:0;">Dán câu hỏi và đáp án vào đây (Mỗi dòng 1 câu):</p>
+            <p style="color:#64748b; margin-top:0;">Dán câu hỏi và đáp án vào đây (Tool sẽ tự động lọc sạch A, B, C cũ):</p>
             <textarea id="rawInput" placeholder="Ví dụ:
-Câu 1: Thủ đô VN?
-Hà Nội
-Đà Nẵng"></textarea>
+1. Thủ đô VN?
+A. Hà Nội
+B. Đà Nẵng"></textarea>
             <div style="text-align: right;">
                 <button class="btn btn-primary" onclick="analyzeRaw()">Phân tích & Chọn đáp án ➡️</button>
             </div>
@@ -407,7 +407,7 @@ Hà Nội
         }
     }
 
-    // --- CREATOR LOGIC ---
+    // --- CREATOR LOGIC (UPDATED V6) ---
     window.analyzeRaw = () => {
         const text = document.getElementById('rawInput').value;
         const lines = text.split('\n').filter(l => l.trim());
@@ -415,17 +415,30 @@ Hà Nội
         let currentQ = null;
 
         lines.forEach(line => {
-            line = line.trim();
-            // Detect question: Starts with "Câu", number., or ends with ?
-            const isQ = /^(Câu|Bài)\s/i.test(line) || /^\d+[\.:]/.test(line) || line.endsWith('?');
-            // Clean bullets
-            const cleanText = line.replace(/^[·\-\+\•]\s*/, '');
-
+            let cleanLine = line.trim();
+            // Detect question
+            const isQ = /^(Câu|Bài)\s/i.test(cleanLine) || /^\d+[\.:]/.test(cleanLine) || cleanLine.endsWith('?');
+            
             if(isQ) {
+                // CLEAN UP Question Text: Remove "Câu 1:", "1.", "Bài 1:"
+                let cleanText = cleanLine.replace(/^(Câu|Bài|Question)?\s*\d+[\.\:\)]\s*/i, '').trim();
+                
                 if(currentQ) currentRawData.push(currentQ);
                 currentQ = { text: cleanText, options: [], correctIdx: 0 };
             } else {
-                if(currentQ) currentQ.options.push(cleanText);
+                // CLEAN UP Option Text (V6: Aggressive loop cleanup)
+                // Loại bỏ lặp đi lặp lại: "-", "A.", "1.", "a)" cho đến khi sạch
+                let processed = cleanLine;
+                let maxLoops = 5; // Tránh lặp vô hạn
+                while(maxLoops > 0) {
+                    let old = processed;
+                    processed = processed.replace(/^([\s\·\-\+\•\*]+|[\w]{1,2}[\.\)\:\-]\s*)/, '');
+                    processed = processed.trim();
+                    if(old === processed) break; // Không còn gì để xóa
+                    maxLoops--;
+                }
+                
+                if(currentQ) currentQ.options.push(processed);
             }
         });
         if(currentQ) currentRawData.push(currentQ);
@@ -438,7 +451,7 @@ Hà Nội
         currentRawData.forEach((q, qIdx) => {
             const div = document.createElement('div');
             div.className = 'question-block';
-            let html = `<div style="font-weight:bold; margin-bottom:8px;">${q.text}</div>`;
+            let html = `<div style="font-weight:bold; margin-bottom:8px;">${qIdx + 1}. ${q.text}</div>`;
             q.options.forEach((opt, oIdx) => {
                 html += `<label class="opt-label">
                     <input type="radio" name="q_${qIdx}" ${oIdx===0?'checked':''} onchange="updateCorrect(${qIdx}, ${oIdx})"> ${opt}
@@ -458,7 +471,7 @@ Hà Nội
         document.getElementById('creator-step2').classList.add('hidden');
     };
 
-    // --- NEW: EXPORT TEXT FEATURE ---
+    // --- EXPORT TEXT FEATURE (V6: CLEAN & STANDARD) ---
     window.exportTextFormat = () => {
         if (!currentRawData || currentRawData.length === 0) {
             alert("Chưa có dữ liệu để xuất!");
@@ -466,21 +479,14 @@ Hà Nội
         }
 
         let output = "";
-        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
+        
         currentRawData.forEach((q, index) => {
-            // Đảm bảo có tiền tố Câu hỏi
-            let qText = q.text;
-            if(!qText.match(/^(Câu|Bài)\s+\d+/i)) {
-                 qText = `Câu hỏi ${index + 1}: ${qText}`;
-            }
+            output += `${q.text}\n`; // Câu hỏi (Không thêm số thứ tự nếu đã có)
             
-            output += `${qText}\n`;
             q.options.forEach((opt, optIdx) => {
                 const isCorrect = optIdx === q.correctIdx;
                 const symbol = isCorrect ? "+" : "-";
-                const letter = alphabet[optIdx] || "?";
-                output += `${symbol} ${letter} ${opt}\n`;
+                output += `${symbol} ${opt}\n`;
             });
             output += "\n"; 
         });
@@ -489,27 +495,21 @@ Hà Nội
         document.getElementById('exportInput').value = output;
     };
 
-    // --- NEW: EXPORT LIBRARY QUIZ ---
+    // --- EXPORT LIBRARY QUIZ ---
     window.exportLibraryQuiz = (e, id) => {
         e.stopPropagation();
         const quiz = libraryData.find(q => q.id === id);
         if(!quiz) return;
 
         let output = "";
-        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
+        
         quiz.questions.forEach((q, index) => {
-            let qText = q.text;
-            if(!qText.match(/^(Câu|Bài)\s+\d+/i)) {
-                 qText = `Câu hỏi ${index + 1}: ${qText}`;
-            }
+            output += `${q.text}\n`;
             
-            output += `${qText}\n`;
             q.options.forEach((opt, optIdx) => {
                 const isCorrect = opt.isCorrect;
                 const symbol = isCorrect ? "+" : "-";
-                const letter = alphabet[optIdx] || "?";
-                output += `${symbol} ${letter} ${opt.text}\n`;
+                output += `${symbol} ${opt.text}\n`;
             });
             output += "\n";
         });
@@ -532,9 +532,9 @@ Hà Nội
 
         try {
             const questionsToSave = currentRawData.map(q => ({
-                text: q.text,
+                text: q.text, // Lưu text sạch
                 options: q.options.map((opt, idx) => ({
-                    text: opt,
+                    text: opt, // Lưu text sạch
                     isCorrect: idx === q.correctIdx
                 }))
             }));
